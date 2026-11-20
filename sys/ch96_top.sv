@@ -52,6 +52,21 @@ module ch96_top
 		.FPGA_CLK3_50(clk_50m),
 		.clk_50m(clk_50m),
 
+		//////////// QSPI PSRAM (loan I/O bus) //////////
+		.PSRAM_SCLK(PSRAM_SCLK),
+		.PSRAM_CE_N(PSRAM_CE_N),
+		.PSRAM_SIO_OUT(PSRAM_SIO_OUT),
+		.PSRAM_SIO_OE(PSRAM_SIO_OE),
+		.PSRAM_SIO_IN(PSRAM_SIO_IN),
+
+		.PSRAM2_SCLK(PSRAM2_SCLK),
+		.PSRAM2_CE_N(PSRAM2_CE_N),
+		.PSRAM2_SIO_OUT(PSRAM2_SIO_OUT),
+		.PSRAM2_SIO_OE(PSRAM2_SIO_OE),
+		.PSRAM2_SIO_IN(PSRAM2_SIO_IN),
+
+        .FAN_PWM(FAN_PWM),
+        
 		//////////// HDMI I2C (HPS I2C2 -> TDA19988) //////////
 		.HDMI_I2C_SCL(I2C2_SCL),
 		.HDMI_I2C_SDA(I2C2_SDA),
@@ -133,14 +148,31 @@ module ch96_top
 	wire sdcd_spdif;
 	assign sdcd_spdif = 1'b1;
 
+	// PSRAM on the loan I/O bus. SIO0=33, SIO1=19, SIO2=17, SIO3=34,
+	// CLK=54, CE#=48 (mirrors psram_qspi_test reference build).
+	wire        PSRAM_SCLK;
+	wire        PSRAM_CE_N;
+	wire  [3:0] PSRAM_SIO_OUT;
+	wire  [3:0] PSRAM_SIO_OE;
+	wire  [3:0] PSRAM_SIO_IN;
+
+   	wire        PSRAM2_SCLK;
+	wire        PSRAM2_CE_N;
+	wire  [3:0] PSRAM2_SIO_OUT;
+	wire  [3:0] PSRAM2_SIO_OE;
+	wire  [3:0] PSRAM2_SIO_IN;
+    
+    // PWM signal for fan control
+    wire FAN_PWM;
+    
 	// The four user LEDs (D5-D8) are HPS GPIO14/22/25/32 (I11/H11/G10/F11),
 	// muxed to LoanIO in the hps-ch96 handoff, so the FPGA drives them through
 	// the loan_io bus. Board LEDs are active-high (1 = lit, as exercised by
 	// the reference design's blink test), matching the sys_top LED vector.
 	wire [7:0] led;
 	wire [66:0] loan_io_in;
-	wire [66:0] loan_io_out = {1'b0, 33'd0, led[6], 6'd0, led[4], 2'd0, led[2], 7'd0, led[0], 14'd0};
-	wire [66:0] loan_io_oe  = {1'b0, 33'd0, 1'b1, 6'd0, 1'b1, 2'd0, 1'b1, 7'd0, 1'b1, 14'd0};
+	wire [66:0] loan_io_out;
+	wire [66:0] loan_io_oe;
 
 	cyclonev_hps_interface_loan_io loan_io_inst
 	(
@@ -149,9 +181,64 @@ module ch96_top
 		.loanio_oe(loan_io_oe)
 	);
 
+	// LED bits also drive the loan_io user LEDs (D5-D8 via HPS GPIO14/22/25/32).
+	assign loan_io_out[14] = led[0];
+	assign loan_io_out[22] = led[2];
+	assign loan_io_out[25] = led[4];
+	assign loan_io_out[32] = led[6];
+	assign loan_io_oe[14]  = 1'b1;
+	assign loan_io_oe[22]  = 1'b1;
+	assign loan_io_oe[25]  = 1'b1;
+	assign loan_io_oe[32]  = 1'b1;
+
+	// PSRAM SIO lines
+	assign loan_io_out[33] = PSRAM_SIO_OUT[0];
+	assign loan_io_out[19] = PSRAM_SIO_OUT[1];
+	assign loan_io_out[17] = PSRAM_SIO_OUT[2];
+	assign loan_io_out[34] = PSRAM_SIO_OUT[3];
+
+	assign loan_io_oe[33] = PSRAM_SIO_OE[0];
+	assign loan_io_oe[19] = PSRAM_SIO_OE[1];
+	assign loan_io_oe[17] = PSRAM_SIO_OE[2];
+	assign loan_io_oe[34] = PSRAM_SIO_OE[3];
+
+	assign PSRAM_SIO_IN[0] = loan_io_in[33];
+	assign PSRAM_SIO_IN[1] = loan_io_in[19];
+	assign PSRAM_SIO_IN[2] = loan_io_in[17];
+	assign PSRAM_SIO_IN[3] = loan_io_in[34];
+
+	assign loan_io_out[54] = PSRAM_SCLK;
+	assign loan_io_oe[54]  = 1'b1;
+	assign loan_io_out[48] = PSRAM_CE_N;
+	assign loan_io_oe[48]  = 1'b1;
+
+    // PSRAM2 SIO lines
+  	assign loan_io_out[29] = PSRAM2_SIO_OUT[0];
+	assign loan_io_out[27] = PSRAM2_SIO_OUT[1];
+	assign loan_io_out[53] = PSRAM2_SIO_OUT[2];
+	assign loan_io_out[30] = PSRAM2_SIO_OUT[3];
+
+	assign loan_io_oe[29] = PSRAM2_SIO_OE[0];
+	assign loan_io_oe[27] = PSRAM2_SIO_OE[1];
+	assign loan_io_oe[53] = PSRAM2_SIO_OE[2];
+	assign loan_io_oe[30] = PSRAM2_SIO_OE[3];
+
+	assign PSRAM2_SIO_IN[0] = loan_io_in[29];
+	assign PSRAM2_SIO_IN[1] = loan_io_in[27];
+	assign PSRAM2_SIO_IN[2] = loan_io_in[53];
+	assign PSRAM2_SIO_IN[3] = loan_io_in[30];
+
+	assign loan_io_out[28] = PSRAM2_SCLK;
+	assign loan_io_oe[28]  = 1'b1;
+	assign loan_io_out[23] = PSRAM2_CE_N;
+	assign loan_io_oe[23]  = 1'b1;
+
 	// RF LEDs: yellow = video-active, blue = always-on. Driven from LED[1]/[3]
 	// so cores/apps can still override them via UIO_LEDS.
 	assign LED_YELLOW = led[1];
 	assign LED_BLUE   = led[3];
 
+    // PWM for fan
+    assign loan_io_oe[49] = 1'b1;
+    assign loan_io_out[49] = FAN_PWM;
 endmodule
