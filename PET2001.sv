@@ -22,7 +22,7 @@
 
 module emu
 (
-	`include "sys/emu_ports.vh"
+	`include "template/sys/emu_ports.vh"
 );
 
 assign ADC_BUS  = 'Z;
